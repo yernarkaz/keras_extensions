@@ -19,7 +19,7 @@ class RBM(Layer):
     # ------------------------------------------------------
 
     def __init__(self, input_dim, hidden_dim, init='glorot_uniform', weights=None, name=None,
-        W_regularizer=None, bx_regularizer=None, bh_regularizer=None, activity_regularizer=None,
+        W_regularizer=None, bx_regularizer=None, bh_regularizer=None, #activity_regularizer=None,
         W_constraint=None, bx_constraint=None, bh_constraint=None):
 
         super(RBM, self).__init__()
@@ -51,10 +51,10 @@ class RBM(Layer):
             self.bh_regularizer.set_param(self.bh)
             self.regularizers.append(self.bh_regularizer)
 
-        self.activity_regularizer = regularizers.get(activity_regularizer)
-        if self.activity_regularizer:
-            self.activity_regularizer.set_layer(self)
-            self.regularizers.append(self.activity_regularizer)
+        #self.activity_regularizer = regularizers.get(activity_regularizer)
+        #if self.activity_regularizer:
+        #    self.activity_regularizer.set_layer(self)
+        #    self.regularizers.append(self.activity_regularizer)
 
         self.W_constraint = constraints.get(W_constraint)
         self.bx_constraint = constraints.get(bx_constraint)
@@ -88,7 +88,7 @@ class RBM(Layer):
             "W_regularizer": self.W_regularizer.get_config() if self.W_regularizer else None,
             "bx_regularizer": self.bx_regularizer.get_config() if self.bx_regularizer else None,
             "bh_regularizer": self.bh_regularizer.get_config() if self.bh_regularizer else None,
-            "activity_regularizer": self.activity_regularizer.get_config() if self.activity_regularizer else None,
+            #"activity_regularizer": self.activity_regularizer.get_config() if self.activity_regularizer else None,
             "W_constraint": self.W_constraint.get_config() if self.W_constraint else None,
             "bx_constraint": self.bx_constraint.get_config() if self.bx_constraint else None,
             "bh_constraint": self.bh_constraint.get_config() if self.bh_constraint else None}
