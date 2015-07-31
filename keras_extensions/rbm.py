@@ -269,11 +269,11 @@ class GBRBM(RBM):
     """
 
     def __init__(self, input_dim, hidden_dim, init='glorot_uniform', weights=None, name=None,
-        W_regularizer=None, bx_regularizer=None, bh_regularizer=None, activity_regularizer=None,
+        W_regularizer=None, bx_regularizer=None, bh_regularizer=None, #activity_regularizer=None,
         W_constraint=None, bx_constraint=None, bh_constraint=None):
 
         super(GBRBM, self).__init__(input_dim, hidden_dim, init, weights, name,
-        W_regularizer, bx_regularizer, bh_regularizer, activity_regularizer,
+        W_regularizer, bx_regularizer, bh_regularizer, #activity_regularizer,
         W_constraint, bx_constraint, bh_constraint)
 
     # -------------
