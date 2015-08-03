@@ -81,7 +81,11 @@ print('Training took %f minutes' % ((end_time - begin_time)/60.0))
 
 # save model parameters
 print('Saving model...')
-train_model.save_weights('example.hdf5', overwrite=True)
+rbm.save_weights('example.hdf5', overwrite=True)
+
+# load model parameters
+print('Loading model...')
+rbm.load_weights('example.hdf5')
 
 # generate hidden features from input data
 print('Creating inference model...')

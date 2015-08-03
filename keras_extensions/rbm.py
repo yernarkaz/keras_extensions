@@ -256,6 +256,43 @@ class RBM(Layer):
         layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()], name=name)
         return layer
 
+    # persistence, copied from keras.models.Sequential
+    def save_weights(self, filepath, overwrite=False):
+        # Save weights to HDF5
+        import h5py
+        import os.path
+        # if file exists and should not be overwritten
+        if not overwrite and os.path.isfile(filepath):
+            import sys
+            get_input = input
+            if sys.version_info[:2] <= (2, 7):
+                get_input = raw_input
+            overwrite = get_input('[WARNING] %s already exists - overwrite? [y/n]' % (filepath))
+            while overwrite not in ['y', 'n']:
+                overwrite = get_input('Enter "y" (overwrite) or "n" (cancel).')
+            if overwrite == 'n':
+                return
+            print('[TIP] Next time specify overwrite=True in save_weights!')
+
+        f = h5py.File(filepath, 'w')
+        weights = self.get_weights()
+        f.attrs['nb_params'] = len(weights)
+        for n, param in enumerate(weights):
+            param_name = 'param_{}'.format(n)
+            param_dset = f.create_dataset(param_name, param.shape, dtype=param.dtype)
+            param_dset[:] = param
+        f.flush()
+        f.close()
+
+    def load_weights(self, filepath):
+        # Loads weights from HDF5 file
+        import h5py
+        f = h5py.File(filepath)
+        weights = [f['param_{}'.format(p)] for p in range(f.attrs['nb_params'])]
+        self.set_weights(weights)
+        f.close()
+
+
 
 class GBRBM(RBM):
     """
