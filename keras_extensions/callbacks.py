@@ -60,6 +60,7 @@ class UnsupervisedLoss1Logger(Callback):
         self.every_n_epochs = every_n_epochs
         self.display_delta = display_delta
         self.prev_loss = None
+        #self.batch_losses = []
 
     def compile(self, theano_mode=None):
         # re-use a function from keras.Model
@@ -80,19 +81,27 @@ class UnsupervisedLoss1Logger(Callback):
         X = standardize_X(X)
         return self._predict_loop(self._loss, X, batch_size, verbose)[0]
 
+    #def on_batch_end(self, batch, logs={}):
+    #    # loss of training batch after each training batch update
+    #    batch_size = logs['size']
+    #    X_batch = self.X[batch*batch_size:(batch+1)*batch_size]
+    #    batch_loss = np.mean(self._predict(X_batch, verbose=0))
+    #    self.batch_losses.append(batch_loss)
+
     def on_epoch_end(self, epoch, logs={}):
         if (epoch+1) % self.every_n_epochs == 0:
+            #loss = np.mean(np.asarray(self.batch_losses))
+            #self.batch_losses = []
             loss = np.mean(self._predict(self.X, verbose=self.verbose))
             if self.prev_loss:
                 delta_loss = loss - self.prev_loss
             else:
                 delta_loss = None
             self.prev_loss = loss
-            if self.verbose > 0:
-                if self.display_delta and delta_loss:
-                    print('%s: %f (%+f)' % (self.label, loss, delta_loss))
-                else:
-                    print('%s: %f' % (self.label, loss))
+            if self.display_delta and delta_loss:
+                print('%s: %f (%+f)' % (self.label, loss, delta_loss))
+            else:
+                print('%s: %f' % (self.label, loss))
 
 class UnsupervisedLoss2Logger(Callback):
     def __init__(self, X_train, X_test, loss, verbose=1, label='loss', every_n_epochs=1, display_delta=True):
@@ -134,9 +143,8 @@ class UnsupervisedLoss2Logger(Callback):
             else:
                 delta_loss = None
             self.prev_loss = loss
-            if self.verbose > 0:
-                if self.display_delta and delta_loss:
-                    print('%s: %f (%+f)' % (self.label, loss, delta_loss))
-                else:
-                    print('%s: %f' % (self.label, loss))
+            if self.display_delta and delta_loss:
+                print('%s: %f (%+f)' % (self.label, loss, delta_loss))
+            else:
+                print('%s: %f' % (self.label, loss))
 
