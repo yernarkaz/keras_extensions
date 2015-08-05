@@ -1,5 +1,6 @@
 import sys
 import os
+from contextlib import contextmanager
 
 class Logger(object):
     """
@@ -46,9 +47,36 @@ class Logger(object):
         pass # already flushes each write
 
 
-def redirect_std_streams(logger):
+@contextmanager
+def log_to_file(filename, mode='w', stream=sys.stdout):
     """
-    Logging helper to redirect both stdout and stderr to the same stream-like object (in particular an instance of the Logger).
+    Context manager that temporarily redirects stdout and stderr to 
+    console (stdout) and file at the same time.
+
+    Example:
+    with log_to_file('myscript.log'):
+        print('Running computation...')
+        run_computation()
     """
+    # keep track of original
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    # create simultaneous stream and file logger
+    logger = Logger(filename, mode, stream)
+    # redirect stdout and stderr
     sys.stdout = logger
     sys.stderr = logger
+    try:
+        # run code inside 'with' statement
+        yield
+    finally:
+        # restore original stdout and stderr
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+
+#def redirect_std_streams(logger):
+#    """
+#    Logging helper to redirect both stdout and stderr to the same stream-like object (in particular an instance of the Logger).
+#    """
+#    sys.stdout = logger
+#    sys.stderr = logger
