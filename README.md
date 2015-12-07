@@ -7,3 +7,5 @@ Extensions
 - Momentum schedule
 - Logging helpers (simultaneous logging to console and log file)
 
+Note that this repository is currently not up-to-date with Keras master
+
