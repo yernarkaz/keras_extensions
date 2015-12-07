@@ -15,9 +15,9 @@ from keras_extensions.logging import log_to_file
 from keras_extensions.models import SingleLayerUnsupervised
 from keras_extensions.rbm import GBRBM
 from keras_extensions.layers import SampleBernoulli
-from keras_extensions.callbacks import MomentumScheduler, UnsupervisedLoss1Logger, UnsupervisedLoss2Logger
+from keras_extensions.callbacks import make_stepped_schedule, MomentumScheduler#, UnsupervisedLoss1Logger, UnsupervisedLoss2Logger
 from keras_extensions.initializers import glorot_uniform_sigm
-from keras_extensions.preprocessing import standardize
+#from keras_extensions.preprocessing import standardize
 
 # configuration
 input_dim = 100
@@ -27,13 +27,14 @@ nb_epoch = 10
 lr = 0.0001  # small learning rate for GB-RBM
 momentum_schedule = [(0, 0.5), (5, 0.9)]  # start momentum at 0.5, then 0.9 after 5 epochs
 
+@log_to_file('example.log')
 def main():
     # generate dummy dataset
     nframes = 10000
     dataset = np.random.normal(loc=np.zeros(input_dim), scale=np.ones(input_dim), size=(nframes, input_dim))
 
     # standardize (in this case superfluous)
-    dataset, mean, stddev = standardize(dataset)
+    #dataset, mean, stddev = standardize(dataset)
 
     # split into train and test portion
     ntest   = 1000
@@ -42,21 +43,23 @@ def main():
     X_trainsub = dataset[:ntest, :]  # subset of training data with same number of samples as testset
     assert X_train.shape[0] >= X_test.shape[0], 'Train set should be at least size of test set!'
 
-    # create model
+    # setup model structure
     print('Creating training model...')
     rbm = GBRBM(input_dim=input_dim, hidden_dim=hidden_dim, init=glorot_uniform_sigm)
     rbm.srng = RandomStreams(seed=srng_seed)
     train_model = SingleLayerUnsupervised()
     train_model.add(rbm)
 
-    # compile theano graph
-    print('Compiling Theano graph...')
-
+    # setup optimizer, loss
+    momentum_schedule = make_stepped_schedule([(0, 0.5), (5, 0.9)])
     momentum_scheduler = MomentumScheduler(momentum_schedule)
-    opt = SGD(lr, momentum_scheduler.momentum_var, decay=0.0, nesterov=False)
+
+    opt = SGD(lr, 0., decay=0.0, nesterov=False)
 
     contastive_divergence = rbm.constrastive_divergence_loss(nb_gibbs_steps=1)
 
+    # compile theano graph
+    print('Compiling Theano graph...')
     train_model.compile(optimizer=opt, loss=contastive_divergence)
 
     # additional monitors
@@ -104,5 +107,4 @@ def main():
     print('Done!')
 
 if __name__ == '__main__':
-    with log_to_file('example.log'):
-        main()
+    main()

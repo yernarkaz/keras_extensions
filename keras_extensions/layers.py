@@ -6,11 +6,12 @@ from keras.layers.core import Layer
 
 class SampleBernoulli(Layer):
     """
-    Layer which samples a Bernoulli distribution whose statistics (means, 'p') are given 
+    Layer which samples a Bernoulli distribution whose statistics (mean, 'p') are given 
     as inputs to the layer.
 
     :param mode:    'maximum_likelihood' for maximum likelihood sample, 
-                    'random' for random sample.
+                    'random' for random sample,
+                    'mean_field' for mean-field approximation.
     """
     def __init__(self, mode='maximum_likelihood'):
         super(SampleBernoulli, self).__init__()
@@ -30,5 +31,9 @@ class SampleBernoulli(Layer):
             #    x* = x ~ p(x) = 1              if p(x=1) > uniform(0, 1)
             #                    0              otherwise
             return self.srng.binomial(size=p.shape, n=1, p=p, dtype=theano.config.floatX)
+        elif self.mode == 'mean_field':
+            # draw mean-field approximation sample from Bernoulli distribution
+            #    x* = E[p(x)] = E[Bern(x; p)] = p
+            return p
         else:
             raise NotImplementedError('Unknown sample mode!')

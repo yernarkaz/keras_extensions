@@ -19,8 +19,8 @@ class RBM(Layer):
     # ------------------------------------------------------
 
     def __init__(self, input_dim, hidden_dim, init='glorot_uniform', weights=None, name=None,
-        W_regularizer=None, bx_regularizer=None, bh_regularizer=None, #activity_regularizer=None,
-        W_constraint=None, bx_constraint=None, bh_constraint=None):
+                 W_regularizer=None, bx_regularizer=None, bh_regularizer=None, #activity_regularizer=None,
+                 W_constraint=None, bx_constraint=None, bh_constraint=None):
 
         super(RBM, self).__init__()
         self.init = initializations.get(init)
@@ -35,7 +35,6 @@ class RBM(Layer):
         self.params = [self.W, self.bx, self.bh]
 
         self.regularizers = []
-
         self.W_regularizer = regularizers.get(W_regularizer)
         if self.W_regularizer:
             self.W_regularizer.set_param(self.W)
@@ -69,10 +68,27 @@ class RBM(Layer):
 
         self.srng = RandomStreams(seed=np.random.randint(10e6))
 
+        #self.use_unrolled_loops = False # use unrolled loops instead of Theano's scan(); either may faster/slower compile-time, run-time, more/less memory usage
+
+#    def init_updates(self):
+#        self.updates = []
+#        #if self.use_unrolled_loops:
+#        #    self.updates = []                                   # when using unrolled loops, there are no additional updates
+#        #else:
+#        #    self.updates = self.get_mcmc_updates(self.input)    # when using scan() with > 1 step, additional updates are produced
+
     def set_name(self, name):
         self.W.name = '%s_W' % name
         self.bx.name = '%s_bx' % name
         self.bh.name = '%s_bh' % name
+
+    @property
+    def nb_input(self):
+        return 1
+
+    @property
+    def nb_output(self):
+        return 0 # RBM has no output, use get_h_given_x_layer(), get_x_given_h_layer() instead
 
     def get_input(self, train=False):
         return self.input
@@ -82,17 +98,53 @@ class RBM(Layer):
 
     def get_config(self):
         return {"name": self.__class__.__name__,
-            "input_dim": self.input_dim,
-            "hidden_dim": self.hidden_dim,
-            "init": self.init.__name__,
-            "W_regularizer": self.W_regularizer.get_config() if self.W_regularizer else None,
-            "bx_regularizer": self.bx_regularizer.get_config() if self.bx_regularizer else None,
-            "bh_regularizer": self.bh_regularizer.get_config() if self.bh_regularizer else None,
-            #"activity_regularizer": self.activity_regularizer.get_config() if self.activity_regularizer else None,
-            "W_constraint": self.W_constraint.get_config() if self.W_constraint else None,
-            "bx_constraint": self.bx_constraint.get_config() if self.bx_constraint else None,
-            "bh_constraint": self.bh_constraint.get_config() if self.bh_constraint else None}
+                "input_dim": self.input_dim,
+                "hidden_dim": self.hidden_dim,
+                "init": self.init.__name__,
+                "W_regularizer": self.W_regularizer.get_config() if self.W_regularizer else None,
+                "bx_regularizer": self.bx_regularizer.get_config() if self.bx_regularizer else None,
+                "bh_regularizer": self.bh_regularizer.get_config() if self.bh_regularizer else None,
+                #"activity_regularizer": self.activity_regularizer.get_config() if self.activity_regularizer else None,
+                "W_constraint": self.W_constraint.get_config() if self.W_constraint else None,
+                "bx_constraint": self.bx_constraint.get_config() if self.bx_constraint else None,
+                "bh_constraint": self.bh_constraint.get_config() if self.bh_constraint else None}
 
+    # persistence, copied from keras.models.Sequential
+    def save_weights(self, filepath, overwrite=False):
+        # Save weights to HDF5
+        import h5py
+        import os.path
+        # if file exists and should not be overwritten
+        if not overwrite and os.path.isfile(filepath):
+            import sys
+            get_input = input
+            if sys.version_info[:2] <= (2, 7):
+                get_input = raw_input
+            overwrite = get_input('[WARNING] %s already exists - overwrite? [y/n]' % (filepath))
+            while overwrite not in ['y', 'n']:
+                overwrite = get_input('Enter "y" (overwrite) or "n" (cancel).')
+            if overwrite == 'n':
+                return
+            print('[TIP] Next time specify overwrite=True in save_weights!')
+
+        f = h5py.File(filepath, 'w')
+        weights = self.get_weights()
+        f.attrs['nb_params'] = len(weights)
+        for n, param in enumerate(weights):
+            param_name = 'param_{}'.format(n)
+            param_dset = f.create_dataset(param_name, param.shape, dtype=param.dtype)
+            param_dset[:] = param
+        f.flush()
+        f.close()
+
+    def load_weights(self, filepath):
+        # Loads weights from HDF5 file
+        import h5py
+        f = h5py.File(filepath)
+        weights = [f['param_{}'.format(p)] for p in range(f.attrs['nb_params'])]
+        self.set_weights(weights)
+        f.close()
+    
     # -------------
     # RBM internals
     # -------------
@@ -138,7 +190,7 @@ class RBM(Layer):
         x_sigm = T.nnet.sigmoid(x_pre)              # mean of Bernoulli distribution ('p', prob. of variable taking value 1), sometimes called mean-field value
         x_samp = self.srng.binomial(size=x_sigm.shape, n=1, p=x_sigm, dtype=theano.config.floatX)
                                                     # random sample
-                                                    #   \hat{h} = 1,      if p(h=1|x) > uniform(0, 1)
+                                                    #   \hat{x} = 1,      if p(x=1|h) > uniform(0, 1)
                                                     #             0,      otherwise
         # pre and sigm are returned to compute cross-entropy
         return x_samp, x_pre, x_sigm
@@ -161,7 +213,6 @@ class RBM(Layer):
 
            x0 (data) -> h1 -> x1 -> ... -> xk (reconstruction, negative sample)
         """
-        # run k steps of Gibbs sampling x0 (data) -> h1 -> x1 -> ... -> xk (reconstruction, negative sample)
 
         # >>> using theano.scan():
         #result, updates = theano.scan(self.gibbs_xhx, outputs_info=(x, None, None), n_steps=nb_gibbs_steps)
@@ -176,7 +227,7 @@ class RBM(Layer):
             xi, xi_pre, xi_sigm = self.gibbs_xhx(xi)
         x_rec, x_rec_pre, x_rec_sigm = xi, xi_pre, xi_sigm
         # <<<
-
+        
         x_rec = theano.gradient.disconnected_grad(x_rec)    # avoid back-propagating gradient through the Gibbs sampling
                                                             # this is similar to T.grad(.., consider_constant=[chain_end])
                                                             # however, as grad() is called in keras.optimizers.Optimizer, 
@@ -188,21 +239,20 @@ class RBM(Layer):
         """
         Compute contrastive divergence loss with k steps of Gibbs sampling (CD-k).
 
-        Result is a Theano expression with the form loss(x).
+        Result is a Theano expression with the form loss = f(x).
         """
         def loss(x):
             x_rec, _, _ = self.mcmc_chain(x, nb_gibbs_steps)
-
             cd = T.mean(self.free_energy(x)) - T.mean(self.free_energy(x_rec))
-
             return cd
+
         return loss
 
     def reconstruction_loss(self, nb_gibbs_steps=1):
         """
         Compute binary cross-entropy between the binary input data and the reconstruction generated by the model.
 
-        Result is a Theano expression with the form loss(x).
+        Result is a Theano expression with the form loss = f(x).
 
         Useful as a rough indication of training progress (see Hinton2010).
         Summed over feature dimensions, mean over samples.
@@ -255,53 +305,19 @@ class RBM(Layer):
 
     def get_h_given_x_layer(self, name=None):
         """
-        Generates a new Dense Layer that computes mean of Bernoulli distribution p(h|x) = p(h=1|x).
+        Generates a new Dense Layer that computes mean of Bernoulli distribution p(h|x), ie. p(h=1|x).
         """
         layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()], name=name)
         return layer
 
-    def get_x_given_h_as_layer(self, name=None):
+    def get_x_given_h_layer(self, name=None):
         """
-        Generates a new Dense Layer that computes mean of Bernoulli distribution p(x|h) = p(x=1|h).
+        Generates a new Dense Layer that computes mean of Bernoulli distribution p(x|h), ie. p(x=1|h).
         """
         layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()], name=name)
         return layer
 
-    # persistence, copied from keras.models.Sequential
-    def save_weights(self, filepath, overwrite=False):
-        # Save weights to HDF5
-        import h5py
-        import os.path
-        # if file exists and should not be overwritten
-        if not overwrite and os.path.isfile(filepath):
-            import sys
-            get_input = input
-            if sys.version_info[:2] <= (2, 7):
-                get_input = raw_input
-            overwrite = get_input('[WARNING] %s already exists - overwrite? [y/n]' % (filepath))
-            while overwrite not in ['y', 'n']:
-                overwrite = get_input('Enter "y" (overwrite) or "n" (cancel).')
-            if overwrite == 'n':
-                return
-            print('[TIP] Next time specify overwrite=True in save_weights!')
 
-        f = h5py.File(filepath, 'w')
-        weights = self.get_weights()
-        f.attrs['nb_params'] = len(weights)
-        for n, param in enumerate(weights):
-            param_name = 'param_{}'.format(n)
-            param_dset = f.create_dataset(param_name, param.shape, dtype=param.dtype)
-            param_dset[:] = param
-        f.flush()
-        f.close()
-
-    def load_weights(self, filepath):
-        # Loads weights from HDF5 file
-        import h5py
-        f = h5py.File(filepath)
-        weights = [f['param_{}'.format(p)] for p in range(f.attrs['nb_params'])]
-        self.set_weights(weights)
-        f.close()
 
 
 
@@ -310,19 +326,21 @@ class GBRBM(RBM):
     Gaussian-Bernoulli Restricted Boltzmann Machine (GB-RBM).
 
     This GB-RBM does not learn variances of Gaussian units, but instead fixes them to 1 and 
-    uses noise-free reconstructions. Input data should be pre-processed to have zero means 
-    and unit variances along the feature dimensions.
+    uses noise-free reconstructions. Input data should be pre-processed to have zero mean 
+    and unit variance along the feature dimensions.
 
     See: Hinton, "A Practical Guide to Training Restricted Boltzmann Machines", UTML TR 2010-003, 2010, section 13.2.
     """
 
     def __init__(self, input_dim, hidden_dim, init='glorot_uniform', weights=None, name=None,
-        W_regularizer=None, bx_regularizer=None, bh_regularizer=None, #activity_regularizer=None,
-        W_constraint=None, bx_constraint=None, bh_constraint=None):
+                 W_regularizer=None, bx_regularizer=None, bh_regularizer=None, #activity_regularizer=None,
+                 W_constraint=None, bx_constraint=None, bh_constraint=None):
 
         super(GBRBM, self).__init__(input_dim, hidden_dim, init, weights, name,
         W_regularizer, bx_regularizer, bh_regularizer, #activity_regularizer,
         W_constraint, bx_constraint, bh_constraint)
+
+    # inherited RBM functions same as BB-RBM
 
     # -------------
     # RBM internals
@@ -358,7 +376,7 @@ class GBRBM(RBM):
         """
         Compute mean squared error between input data and the reconstruction generated by the model.
 
-        Result is a Theano expression with the form loss(x).
+        Result is a Theano expression with the form loss = f(x).
 
         Useful as a rough indication of training progress (see Hinton2010).
         Mean over samples and feature dimensions.
@@ -378,6 +396,3 @@ class GBRBM(RBM):
         """
         layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()], name=name)
         return layer
-
-    # save_weights() same as BB-RBM
-    # load_weights() same as BB-RBM
