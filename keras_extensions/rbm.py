@@ -1,14 +1,14 @@
 from __future__ import division
 
-import theano
-import theano.tensor as T
 import numpy as np
 
 from keras import  initializations, regularizers, constraints
-from keras.utils.theano_utils import shared_zeros
+from keras import backend as K 
 from keras.layers.core import Layer, Dense
 
-from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+from .backend import random_binomial
+
+import theano
 
 class RBM(Layer):
     """
@@ -27,10 +27,10 @@ class RBM(Layer):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
 
-        self.input = T.matrix()
+        self.input = K.placeholder(ndim = 2)
         self.W = self.init((self.input_dim, self.hidden_dim))
-        self.bx = shared_zeros((self.input_dim))
-        self.bh = shared_zeros((self.hidden_dim))
+        self.bx = K.zeros((self.input_dim))
+        self.bh = K.zeros((self.hidden_dim))
 
         self.params = [self.W, self.bx, self.bh]
 
@@ -65,17 +65,6 @@ class RBM(Layer):
 
         if name is not None:
             self.set_name(name)
-
-        self.srng = RandomStreams(seed=np.random.randint(10e6))
-
-        #self.use_unrolled_loops = False # use unrolled loops instead of Theano's scan(); either may faster/slower compile-time, run-time, more/less memory usage
-
-#    def init_updates(self):
-#        self.updates = []
-#        #if self.use_unrolled_loops:
-#        #    self.updates = []                                   # when using unrolled loops, there are no additional updates
-#        #else:
-#        #    self.updates = self.get_mcmc_updates(self.input)    # when using scan() with > 1 step, additional updates are produced
 
     def set_name(self, name):
         self.W.name = '%s_W' % name
@@ -157,9 +146,9 @@ class RBM(Layer):
         p(x) = 1/Z exp(-F(x)), where the free energy F(x) = -sum_j=1^H log(1 + exp(x^T W[:,j] + bh_j)) - bx^T x, 
         in case of the Bernoulli RBM energy function.
         """
-        wx_b = T.dot(x, self.W) + self.bh
-        hidden_term = T.sum(T.log(1 + T.exp(wx_b)), axis=1)
-        vbias_term = T.dot(x, self.bx)
+        wx_b = K.dot(x, self.W) + self.bh
+        hidden_term = K.sum(K.log(1 + K.exp(wx_b)), axis=1)
+        vbias_term = K.dot(x, self.bx)
         return -hidden_term - vbias_term
 
     def sample_h_given_x(self, x):
@@ -169,9 +158,9 @@ class RBM(Layer):
         For Bernoulli RBM the conditional probability distribution can be derived to be 
            p(h_j=1|x) = sigmoid(x^T W[:,j] + bh_j).
         """
-        h_pre = T.dot(x, self.W) + self.bh          # pre-sigmoid (used in cross-entropy error calculation for better numerical stability)
-        h_sigm = T.nnet.sigmoid(h_pre)              # mean of Bernoulli distribution ('p', prob. of variable taking value 1), sometimes called mean-field value
-        h_samp = self.srng.binomial(size=h_sigm.shape, n=1, p=h_sigm, dtype=theano.config.floatX)
+        h_pre = K.dot(x, self.W) + self.bh          # pre-sigmoid (used in cross-entropy error calculation for better numerical stability)
+        h_sigm = K.sigmoid(h_pre)              # mean of Bernoulli distribution ('p', prob. of variable taking value 1), sometimes called mean-field value
+        h_samp = random_binomial(shape=h_sigm.shape, n=1, p=h_sigm)
                                                     # random sample
                                                     #   \hat{h} = 1,      if p(h=1|x) > uniform(0, 1)
                                                     #             0,      otherwise
@@ -186,9 +175,9 @@ class RBM(Layer):
            p(x_i=1|h) = sigmoid(W[i,:] h + bx_i).
         """
 
-        x_pre = T.dot(h, self.W.T) + self.bx        # pre-sigmoid (used in cross-entropy error calculation for better numerical stability)
-        x_sigm = T.nnet.sigmoid(x_pre)              # mean of Bernoulli distribution ('p', prob. of variable taking value 1), sometimes called mean-field value
-        x_samp = self.srng.binomial(size=x_sigm.shape, n=1, p=x_sigm, dtype=theano.config.floatX)
+        x_pre = K.dot(h, self.W.T) + self.bx        # pre-sigmoid (used in cross-entropy error calculation for better numerical stability)
+        x_sigm = K.sigmoid(x_pre)              # mean of Bernoulli distribution ('p', prob. of variable taking value 1), sometimes called mean-field value
+        x_samp = random_binomial(shape=x_sigm.shape, n=1, p=x_sigm)
                                                     # random sample
                                                     #   \hat{x} = 1,      if p(x=1|h) > uniform(0, 1)
                                                     #             0,      otherwise
@@ -214,19 +203,10 @@ class RBM(Layer):
            x0 (data) -> h1 -> x1 -> ... -> xk (reconstruction, negative sample)
         """
 
-        # >>> using theano.scan():
-        #result, updates = theano.scan(self.gibbs_xhx, outputs_info=(x, None, None), n_steps=nb_gibbs_steps)
-        #x_pres, x_sigms, x_samps = result
-        #x_rec, x_rec_pre, x_rec_sigm = x_samps[-1], x_pres[-1], x_sigms[-1] # end of chain
-        # XXX: cannot just ignore the updates generated by scan(), will fail if nb_gibbs_steps > 1
-        # <<<
-
-        # >>> using for loop:
         xi = x
         for i in xrange(nb_gibbs_steps):
             xi, xi_pre, xi_sigm = self.gibbs_xhx(xi)
         x_rec, x_rec_pre, x_rec_sigm = xi, xi_pre, xi_sigm
-        # <<<
         
         x_rec = theano.gradient.disconnected_grad(x_rec)    # avoid back-propagating gradient through the Gibbs sampling
                                                             # this is similar to T.grad(.., consider_constant=[chain_end])
@@ -243,7 +223,7 @@ class RBM(Layer):
         """
         def loss(x):
             x_rec, _, _ = self.mcmc_chain(x, nb_gibbs_steps)
-            cd = T.mean(self.free_energy(x)) - T.mean(self.free_energy(x_rec))
+            cd = K.mean(self.free_energy(x)) - K.mean(self.free_energy(x_rec))
             return cd
 
         return loss
@@ -303,18 +283,20 @@ class RBM(Layer):
         """
         return T.mean(self.free_energy(x_train)) - T.mean(self.free_energy(x_test))
 
-    def get_h_given_x_layer(self, name=None):
+    def get_h_given_x_layer(self):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(h|x), ie. p(h=1|x).
         """
-        layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()], name=name)
+        layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, 
+        	activation='sigmoid', 
+        	weights=[self.W.get_value(), self.bh.get_value()])
         return layer
 
-    def get_x_given_h_layer(self, name=None):
+    def get_x_given_h_layer(self):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(x|h), ie. p(x=1|h).
         """
-        layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()], name=name)
+        layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
         return layer
 
 
@@ -347,9 +329,9 @@ class GBRBM(RBM):
     # -------------
 
     def free_energy(self, x):
-        wx_b = T.dot(x, self.W) + self.bh
-        vbias_term = 0.5*T.sum((x - self.bx)**2, axis=1)
-        hidden_term = T.sum(T.log(1 + T.exp(wx_b)), axis=1)
+        wx_b = K.dot(x, self.W) + self.bh
+        vbias_term = 0.5*K.sum((x - self.bx)**2, axis=1)
+        hidden_term = K.sum(K.log(1 + K.exp(wx_b)), axis=1)
         return -hidden_term + vbias_term
     
     # sample_h_given_x() same as BB-RBM
@@ -360,7 +342,7 @@ class GBRBM(RBM):
         For Gaussian-Bernoulli RBM the conditional probability distribution can be derived to be 
            p(x_i|h) = norm(x_i; sigma_i W[i,:] h + bx_i, sigma_i^2).
         """
-        x_mean = T.dot(h, self.W.T) + self.bx
+        x_mean = K.dot(h, self.W.T) + self.bx
         x_samp = x_mean
                 # variances of the Gaussian units are not learned, 
                 # instead we fix them to 1 in the energy function
@@ -384,15 +366,15 @@ class GBRBM(RBM):
         def loss(x):
             x_rec, _, _ = self.mcmc_chain(x, nb_gibbs_steps)
 
-            return T.mean(T.sqr(x - x_rec))
+            return K.mean(K.sqr(x - x_rec))
         return loss
 
     # free_energy_gap() same as BB-RBM
 
     # get_h_given_x_layer() same as BB-RBM
-    def get_x_given_h_layer(self, name=None):
+    def get_x_given_h_layer(self):
         """
         Generates a new Dense Layer that computes mean of Gaussian distribution p(x|h).
         """
-        layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()], name=name)
+        layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
         return layer
