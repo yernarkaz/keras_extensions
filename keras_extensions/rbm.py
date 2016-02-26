@@ -283,20 +283,24 @@ class RBM(Layer):
         """
         return T.mean(self.free_energy(x_train)) - T.mean(self.free_energy(x_test))
 
-    def get_h_given_x_layer(self):
+    def get_h_given_x_layer(self, initialLayer=False):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(h|x), ie. p(h=1|x).
         """
-        layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, 
-        	activation='sigmoid', 
-        	weights=[self.W.get_value(), self.bh.get_value()])
+        if initialLayer == False:
+            layer = Dense(output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()])
+        else:
+            layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()])
         return layer
 
-    def get_x_given_h_layer(self):
+    def get_x_given_h_layer(self, initialLayer = False):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(x|h), ie. p(x=1|h).
         """
-        layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
+        if initialLayer == False:
+            layer = Dense(output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
+        else:
+            layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
         return layer
 
 
@@ -372,9 +376,12 @@ class GBRBM(RBM):
     # free_energy_gap() same as BB-RBM
 
     # get_h_given_x_layer() same as BB-RBM
-    def get_x_given_h_layer(self):
+    def get_x_given_h_layer(self, initialLayer=False):
         """
         Generates a new Dense Layer that computes mean of Gaussian distribution p(x|h).
         """
-        layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
+        if initialLayer == False:
+            layer = Dense(output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
+        else:
+            layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
         return layer
