@@ -287,7 +287,7 @@ class RBM(Layer):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(h|x), ie. p(h=1|x).
         """
-        if not as_initial_layer:
+        if  as_initial_layer:
             layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()])
         else:
             layer = Dense(output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()])
@@ -297,7 +297,7 @@ class RBM(Layer):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(x|h), ie. p(x=1|h).
         """
-        if not as_initial_layer:
+        if as_initial_layer:
             layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
         else:
             layer = Dense(output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
@@ -381,7 +381,7 @@ class GBRBM(RBM):
         Generates a new Dense Layer that computes mean of Gaussian distribution p(x|h).
         """
         if not as_initial_layer:
-            layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
-        else:
             layer = Dense(output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
+        else:
+            layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
         return layer
