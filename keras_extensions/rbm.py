@@ -215,7 +215,7 @@ class RBM(Layer):
 
         return x_rec, x_rec_pre, x_rec_sigm
 
-    def constrastive_divergence_loss(self, nb_gibbs_steps=1):
+    def contrastive_divergence_loss(self, nb_gibbs_steps=1):
         """
         Compute contrastive divergence loss with k steps of Gibbs sampling (CD-k).
 
