@@ -215,7 +215,7 @@ class RBM(Layer):
 
         return x_rec, x_rec_pre, x_rec_sigm
 
-    def constrastive_divergence_loss(self, nb_gibbs_steps=1):
+    def contrastive_divergence_loss(self, nb_gibbs_steps=1):
         """
         Compute contrastive divergence loss with k steps of Gibbs sampling (CD-k).
 
@@ -283,21 +283,21 @@ class RBM(Layer):
         """
         return T.mean(self.free_energy(x_train)) - T.mean(self.free_energy(x_test))
 
-    def get_h_given_x_layer(self, as_initial_layer=True):
+    def get_h_given_x_layer(self, as_initial_layer=False):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(h|x), ie. p(h=1|x).
         """
-        if not as_initial_layer:
+        if  as_initial_layer:
             layer = Dense(input_dim=self.input_dim, output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()])
         else:
             layer = Dense(output_dim=self.hidden_dim, activation='sigmoid', weights=[self.W.get_value(), self.bh.get_value()])
         return layer
 
-    def get_x_given_h_layer(self, as_initial_layer=True):
+    def get_x_given_h_layer(self, as_initial_layer=False):
         """
         Generates a new Dense Layer that computes mean of Bernoulli distribution p(x|h), ie. p(x=1|h).
         """
-        if not as_initial_layer:
+        if as_initial_layer:
             layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
         else:
             layer = Dense(output_dim=self.input_dim, activation='sigmoid', weights=[self.W.get_value().T, self.bx.get_value()])
@@ -376,12 +376,12 @@ class GBRBM(RBM):
     # free_energy_gap() same as BB-RBM
 
     # get_h_given_x_layer() same as BB-RBM
-    def get_x_given_h_layer(self, as_initial_layer=True):
+    def get_x_given_h_layer(self, as_initial_layer=False):
         """
         Generates a new Dense Layer that computes mean of Gaussian distribution p(x|h).
         """
         if not as_initial_layer:
-            layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
-        else:
             layer = Dense(output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
+        else:
+            layer = Dense(input_dim=self.hidden_dim, output_dim=self.input_dim, activation='linear', weights=[self.W.get_value().T, self.bx.get_value()])
         return layer

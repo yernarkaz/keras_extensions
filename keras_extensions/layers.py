@@ -1,7 +1,7 @@
 import numpy as np
 import theano.tensor as T
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
-
+import theano
 from keras.layers.core import Layer
 
 class SampleBernoulli(Layer):
