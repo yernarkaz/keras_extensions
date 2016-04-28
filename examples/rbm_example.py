@@ -56,11 +56,11 @@ def main():
 
     opt = SGD(lr, 0., decay=0.0, nesterov=False)
 
-    contastive_divergence = rbm.constrastive_divergence_loss(nb_gibbs_steps=1)
+    contrastive_divergence = rbm.contrastive_divergence_loss(nb_gibbs_steps=1)
 
     # compile theano graph
     print('Compiling Theano graph...')
-    train_model.compile(optimizer=opt, loss=contastive_divergence)
+    train_model.compile(optimizer=opt, loss=contrastive_divergence)
 
     # additional monitors
     #rec_loss = rbm.reconstruction_loss(nb_gibbs_steps=1)
