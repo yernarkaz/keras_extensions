@@ -1,7 +1,9 @@
-from keras.models import Model, standardize_X
+from keras.models import Model
 from keras.layers import containers
 from keras import optimizers, objectives
 from keras import backend as K
+
+from keras.preprocessing.image import standardize
 
 class SingleLayerUnsupervised(Model, containers.Sequential):
     """
@@ -49,7 +51,7 @@ class SingleLayerUnsupervised(Model, containers.Sequential):
     def fit(self, X, batch_size=128, nb_epoch=100, verbose=1, callbacks=[],
             validation_split=0., validation_data=None, shuffle=True, show_accuracy=False):
 
-        X = standardize_X(X)
+        X = standardize(X)
 
         val_f = None
         val_ins = None
