@@ -1,11 +1,11 @@
 from keras.models import Model
-from keras.layers import containers
+from keras.models import Sequential
 from keras import optimizers, objectives
 from keras import backend as K
 
-from keras.preprocessing.image import standardize
+from keras.preprocessing.image import ImageDataGenerator
 
-class SingleLayerUnsupervised(Model, containers.Sequential):
+class SingleLayerUnsupervised(Model, Sequential):
     """
     Single layer unsupervised learning Model.
     """
@@ -51,7 +51,7 @@ class SingleLayerUnsupervised(Model, containers.Sequential):
     def fit(self, X, batch_size=128, nb_epoch=100, verbose=1, callbacks=[],
             validation_split=0., validation_data=None, shuffle=True, show_accuracy=False):
 
-        X = standardize(X)
+        X = ImageDataGenerator.standardize(X)
 
         val_f = None
         val_ins = None
